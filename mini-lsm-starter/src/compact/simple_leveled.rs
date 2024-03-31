@@ -1,5 +1,6 @@
-use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+
+use serde::{Deserialize, Serialize};
 
 use crate::lsm_storage::LsmStorageState;
 
@@ -69,7 +70,6 @@ impl SimpleLeveledCompactionController {
                 });
             }
         }
-
         None
     }
 
@@ -112,11 +112,10 @@ impl SimpleLeveledCompactionController {
             assert!(l0_ssts_compacted.is_empty());
             snapshot.l0_sstables = new_l0_sstables;
         }
-
         assert_eq!(
             task.lower_level_sst_ids,
             snapshot.levels[task.lower_level - 1].1,
-            "sst mistached"
+            "sst mismatched"
         );
         files_to_remove.extend(&snapshot.levels[task.lower_level - 1].1);
         snapshot.levels[task.lower_level - 1].1 = output.to_vec();

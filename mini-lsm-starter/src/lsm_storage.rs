@@ -346,9 +346,9 @@ impl LsmStorageInner {
                 if let Some(bloom) = &table.bloom {
                     if bloom.may_contain(farmhash::fingerprint32(key)) {
                         return true;
-                    } else {
-                        return true;
                     }
+                } else {
+                    return true;
                 }
             }
             false
@@ -514,7 +514,15 @@ impl LsmStorageInner {
             let mut snapshot = guard.as_ref().clone();
             let mem = snapshot.imm_memtables.pop().unwrap();
             assert_eq!(mem.id(), sst_id);
-            snapshot.l0_sstables.insert(0, sst_id);
+            // add l0 table
+            if self.compaction_controller.flush_to_l0() {
+                // in leveled compaction or no compaction, simply flush to l0
+                snapshot.l0_sstables.insert(0, sst_id);
+            } else {
+                // in tiered compaction, create a new tier
+                snapshot.levels.insert(0, (sst_id, vec![sst_id]));
+            }
+
             println!("flushed {}.sst with size={}", sst_id, sst.table_size());
             snapshot.sstables.insert(sst_id, sst);
             *guard = Arc::new(snapshot);

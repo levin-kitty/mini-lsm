@@ -200,8 +200,8 @@ impl LsmStorageInner {
                     }
                     let upper_iter = SstConcatIterator::create_and_seek_to_first(upper_ssts)?;
 
-                    let mut lower_ssts = Vec::with_capacity(upper_level_sst_ids.len());
-                    for id in upper_level_sst_ids.iter() {
+                    let mut lower_ssts = Vec::with_capacity(lower_level_sst_ids.len());
+                    for id in lower_level_sst_ids.iter() {
                         lower_ssts.push(snapshot.sstables.get(id).unwrap().clone());
                     }
                     let lower_iter = SstConcatIterator::create_and_seek_to_first(lower_ssts)?;
@@ -230,6 +230,20 @@ impl LsmStorageInner {
                     )
                 }
             },
+            CompactionTask::Tiered(TieredCompactionTask { tiers, .. }) => {
+                let mut iters = Vec::with_capacity(tiers.len());
+                for (_, tier_sst_ids) in tiers {
+                    let mut ssts = Vec::with_capacity(tier_sst_ids.len());
+                    for id in tier_sst_ids.iter() {
+                        ssts.push(snapshot.sstables.get(id).unwrap().clone());
+                    }
+                    iters.push(Box::new(SstConcatIterator::create_and_seek_to_first(ssts)?));
+                }
+                self.compact_generate_sst_from_iter(
+                    MergeIterator::create(iters),
+                    task.compact_to_bottom_level(),
+                )
+            }
             _ => unimplemented!(),
         }
     }
@@ -315,7 +329,7 @@ impl LsmStorageInner {
             let mut ssts_to_remove = Vec::with_capacity(files_to_remove.len());
             for file_to_remove in &files_to_remove {
                 let result = snapshot.sstables.remove(file_to_remove);
-                assert!(result.is_some());
+                assert!(result.is_some(), "cannot remove {}.sst", file_to_remove);
                 ssts_to_remove.push(result.unwrap());
             }
             let mut state = self.state.write();
