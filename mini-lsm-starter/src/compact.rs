@@ -270,24 +270,27 @@ impl LsmStorageInner {
             l0_sstables: l0_sstables.clone(),
             l1_sstables: l1_sstables.clone(),
         };
+
+        println!("force full compaction: {:?}", compaction_task);
+
         let sstables = self.compact(&compaction_task)?;
+        let mut ids = Vec::with_capacity(sstables.len());
 
         {
-            let _state_lock = self.state_lock.lock();
+            let state_lock = self.state_lock.lock();
             let mut state = self.state.read().as_ref().clone();
             for sst in l0_sstables.iter().chain(l1_sstables.iter()) {
                 let result = state.sstables.remove(sst);
                 assert!(result.is_some());
             }
 
-            let mut ids = Vec::with_capacity(sstables.len());
             for new_sst in sstables {
                 ids.push(new_sst.sst_id());
                 let result = state.sstables.insert(new_sst.sst_id(), new_sst);
                 assert!(result.is_none());
             }
             assert_eq!(l1_sstables, state.levels[0].1);
-            state.levels[0].1 = ids;
+            state.levels[0].1 = ids.clone();
 
             let mut l0_sstables_map = l0_sstables.iter().copied().collect::<HashSet<_>>();
             state.l0_sstables = state
@@ -298,10 +301,17 @@ impl LsmStorageInner {
                 .collect::<Vec<_>>();
             assert!(l0_sstables_map.is_empty());
             *self.state.write() = Arc::new(state);
+            self.sync_dir()?;
+            self.manifest.as_ref().unwrap().add_record(
+                &state_lock,
+                ManifestRecord::Compaction(compaction_task, ids.clone()),
+            )?;
         }
         for sst in l0_sstables.iter().chain(l1_sstables.iter()) {
             std::fs::remove_file(self.path_of_sst(*sst))?;
         }
+
+        println!("force full compaction done, new SSTs: {:?}", ids);
 
         Ok(())
     }
