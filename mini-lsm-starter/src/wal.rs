@@ -6,7 +6,6 @@ use std::sync::Arc;
 
 use anyhow::{bail, Context, Result};
 use bytes::{Buf, BufMut, Bytes};
-use crc32fast::hash;
 use crossbeam_skiplist::SkipMap;
 use parking_lot::Mutex;
 

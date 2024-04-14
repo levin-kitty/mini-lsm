@@ -8,7 +8,6 @@ use crate::{
         concat_iterator::SstConcatIterator, merge_iterator::MergeIterator,
         two_merge_iterator::TwoMergeIterator, StorageIterator,
     },
-    key::Key,
     mem_table::MemTableIterator,
     table::SsTableIterator,
 };
@@ -44,8 +43,8 @@ impl LsmIterator {
         }
         match self.end_bound.as_ref() {
             Bound::Unbounded => {}
-            Bound::Included(key) => self.is_valid = self.inner.key() <= Key::from_slice(key),
-            Bound::Excluded(key) => self.is_valid = self.inner.key() < Key::from_slice(key),
+            Bound::Included(key) => self.is_valid = self.inner.key().key_ref() <= key.as_ref(),
+            Bound::Excluded(key) => self.is_valid = self.inner.key().key_ref() < key.as_ref(),
         }
         Ok(())
     }
@@ -66,7 +65,7 @@ impl StorageIterator for LsmIterator {
     }
 
     fn key(&self) -> &[u8] {
-        self.inner.key().raw_ref()
+        self.inner.key().key_ref()
     }
 
     fn value(&self) -> &[u8] {

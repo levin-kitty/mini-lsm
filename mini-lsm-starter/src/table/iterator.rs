@@ -3,11 +3,7 @@ use std::sync::Arc;
 use anyhow::{Ok, Result};
 
 use super::SsTable;
-use crate::{
-    block::BlockIterator,
-    iterators::StorageIterator,
-    key::{Key, KeySlice},
-};
+use crate::{block::BlockIterator, iterators::StorageIterator, key::KeySlice};
 
 /// An iterator over the contents of an SSTable.
 pub struct SsTableIterator {
@@ -45,13 +41,11 @@ impl SsTableIterator {
 
     // TODO: 무엇을 하는 코드 입니까?
     // TODO: modify to binary search
-    fn seek_to_key_inner(table: &Arc<SsTable>, key: &[u8]) -> Result<(usize, BlockIterator)> {
+    fn seek_to_key_inner(table: &Arc<SsTable>, key: KeySlice) -> Result<(usize, BlockIterator)> {
         // blk_idx가 binary search로 동작해야할듯
-        let mut blk_idx = table.find_block_idx(Key::from_slice(key));
-        let mut blk_iter = BlockIterator::create_and_seek_to_key(
-            table.read_block_cached(blk_idx)?,
-            Key::from_slice(key),
-        );
+        let mut blk_idx = table.find_block_idx(key);
+        let mut blk_iter =
+            BlockIterator::create_and_seek_to_key(table.read_block_cached(blk_idx)?, key);
         if !blk_iter.is_valid() {
             blk_idx += 1;
             if blk_idx < table.num_of_blocks() {
@@ -64,7 +58,7 @@ impl SsTableIterator {
 
     /// Create a new iterator and seek to the first key-value pair which >= `key`.
     pub fn create_and_seek_to_key(table: Arc<SsTable>, key: KeySlice) -> Result<Self> {
-        let (blk_idx, blk_iter) = Self::seek_to_key_inner(&table, key.raw_ref())?;
+        let (blk_idx, blk_iter) = Self::seek_to_key_inner(&table, key)?;
         let iter = Self {
             blk_iter,
             table,
@@ -77,7 +71,7 @@ impl SsTableIterator {
     /// Note: You probably want to review the handout for detailed explanation when implementing
     /// this function.
     pub fn seek_to_key(&mut self, key: KeySlice) -> Result<()> {
-        let (blk_idx, blk_iter) = Self::seek_to_key_inner(&self.table, key.raw_ref())?;
+        let (blk_idx, blk_iter) = Self::seek_to_key_inner(&self.table, key)?;
         self.blk_iter = blk_iter;
         self.blk_idx = blk_idx;
         Ok(())
